@@ -29,19 +29,22 @@ impl Service for Server {
 
     fn call(&self, req: Request) -> Self::Future {
         let res = callback(&req);
+        let r = match res {
+            Ok(r) => r,
+            Err(e) => e,
+        };
         Box::new(futures::future::ok(
-            Response::new().with_body(res)
+            Response::new().with_body(r)
         ))
     }
 }
 
-fn callback(req: &Request) -> String {
+fn callback(req: &Request) -> Result<String, String> {
     let path = req.uri().path().to_string().replacen("/", "", 1);
     let p = Path::new(&path);
 
-    // TODO
-    let mut file = File::open(&p).unwrap();
+    let mut file = try!(File::open(&p).map_err(|e| e.to_string()));
     let mut s = String::new();
     file.read_to_string(&mut s).unwrap();
-    s
+    Ok(s)
 }
