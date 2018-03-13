@@ -1,0 +1,8 @@
+[package]
+name = "mini-server"
+version = "0.0.1"
+authors = ["ryota.sakamoto"]
+
+[dependencies]
+hyper = "0.11.20"
+futures = "0.1.14"
