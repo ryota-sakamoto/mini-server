@@ -1,8 +1,9 @@
-#[macro_use] extern crate log;
-extern crate simplelog;
-extern crate hyper;
-extern crate futures;
 extern crate clap;
+extern crate futures;
+extern crate hyper;
+#[macro_use]
+extern crate log;
+extern crate simplelog;
 
 use std::fs::File;
 use std::path::Path;
@@ -10,13 +11,9 @@ use std::io::Read;
 use std::env;
 use simplelog::*;
 use hyper::header::{ContentLength, ContentType};
-use hyper::server::{Http, Response, Request, Service};
-use clap::{Arg, App};
+use hyper::server::{Http, Request, Response, Service};
+use clap::{App, Arg};
 
-/*
-# TODO
-- Add setting root path
-*/
 fn main() {
     init_log();
     let app = init_clap();
@@ -35,29 +32,37 @@ fn main() {
     let ip = format!("127.0.0.1:{}", port);
     info!("Start {}", ip);
     let addr = ip.parse().unwrap();
-    let server = Http::new().bind(&addr, move || Ok(Server {root_path: root_path.to_string()})).unwrap();
+    let server = Http::new()
+        .bind(&addr, move || {
+            Ok(Server {
+                root_path: root_path.to_string(),
+            })
+        })
+        .unwrap();
     server.run().unwrap();
 }
 
 fn init_log() {
-     CombinedLogger::init(vec![
-        SimpleLogger::new(LevelFilter::Info, Config::default())
+    CombinedLogger::init(vec![
+        SimpleLogger::new(LevelFilter::Info, Config::default()),
     ]).unwrap();
 }
 
 fn init_clap<'a, 'b>() -> App<'a, 'b> {
     App::new("mini-server")
-        .arg(Arg::with_name("port")
-            .help("port")
-            .short("p")
-            .long("port")
-            .takes_value(true)
+        .arg(
+            Arg::with_name("port")
+                .help("port")
+                .short("p")
+                .long("port")
+                .takes_value(true),
         )
-        .arg(Arg::with_name("root")
-            .help("document root")
-            .short("r")
-            .long("root")
-            .takes_value(true)
+        .arg(
+            Arg::with_name("root")
+                .help("document root")
+                .short("r")
+                .long("root")
+                .takes_value(true),
         )
 }
 
@@ -71,7 +76,7 @@ impl Server {
         let absolute_path = format!("{}/{}", self.root_path, path);
         let p = Path::new(&absolute_path);
         info!("{}", absolute_path);
-        
+
         let mut file = try!(File::open(&p).map_err(|e| e.to_string()));
         let mut s = String::new();
         file.read_to_string(&mut s).unwrap();
@@ -96,7 +101,7 @@ impl Service for Server {
             Response::new()
                 .with_header(ContentLength(r.len() as u64))
                 .with_header(ContentType::plaintext())
-                .with_body(r)
+                .with_body(r),
         ))
     }
 }
