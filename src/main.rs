@@ -94,13 +94,21 @@ impl Server {
         };
 
         let re = Regex::new(r".+\.(.+)").unwrap();
-        let caps = re.captures(&absolute_path).unwrap();
-        let extension = caps.get(1).unwrap().as_str();
-        let content_type = match extension {
-            "html" => ContentType::html(),
-            "json" => ContentType::json(),
-            _ => ContentType::plaintext(),
-        };
+        let content_type;
+        if let Some(caps) = re.captures(&absolute_path) {
+            let extension = caps.get(1).map_or_else(
+                || {""},
+                |s| {s.as_str()},
+            );
+
+            content_type = match extension {
+                "html" => ContentType::html(),
+                "json" => ContentType::json(),
+                _ => ContentType::plaintext(),
+            };
+        } else {
+            content_type = ContentType::plaintext();
+        }
 
         ResponseData::new(s, content_type, status_code)
     }
