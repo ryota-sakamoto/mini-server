@@ -3,6 +3,7 @@ extern crate futures;
 extern crate hyper;
 #[macro_use]
 extern crate log;
+extern crate regex;
 extern crate simplelog;
 
 use std::fs::File;
@@ -11,8 +12,11 @@ use std::io::Read;
 use std::env;
 use simplelog::*;
 use hyper::header::{ContentLength, ContentType};
+use hyper::StatusCode;
+use hyper::StatusCode::{NotFound, Ok as http_ok};
 use hyper::server::{Http, Request, Response, Service};
 use clap::{App, Arg};
+use regex::Regex;
 
 fn main() {
     init_log();
@@ -71,16 +75,34 @@ struct Server {
 }
 
 impl Server {
-    fn callback(&self, req: &Request) -> Result<String, String> {
+    fn callback(&self, req: &Request) -> ResponseData {
         let path = req.uri().path().to_string().replacen("/", "", 1);
         let absolute_path = format!("{}/{}", self.root_path, path);
         let p = Path::new(&absolute_path);
         info!("{}", absolute_path);
 
-        let mut file = try!(File::open(&p).map_err(|e| e.to_string()));
         let mut s = String::new();
-        file.read_to_string(&mut s).unwrap();
-        Ok(s)
+        let status_code;
+        match File::open(&p) {
+            Ok(ref mut file) => {
+                file.read_to_string(&mut s).unwrap();
+                status_code = http_ok;
+            }
+            Err(_) => {
+                status_code = NotFound;
+            }
+        };
+
+        let re = Regex::new(r".+\.(.+)").unwrap();
+        let caps = re.captures(&absolute_path).unwrap();
+        let extension = caps.get(1).unwrap().as_str();
+        let content_type = match extension {
+            "html" => ContentType::html(),
+            "json" => ContentType::json(),
+            _ => ContentType::plaintext(),
+        };
+
+        ResponseData::new(s, content_type, status_code)
     }
 }
 
@@ -92,16 +114,29 @@ impl Service for Server {
 
     fn call(&self, req: Request) -> Self::Future {
         let res = self.callback(&req);
-        let r = match res {
-            Ok(r) => r,
-            Err(e) => e,
-        };
 
         Box::new(futures::future::ok(
             Response::new()
-                .with_header(ContentLength(r.len() as u64))
-                .with_header(ContentType::plaintext())
-                .with_body(r),
+                .with_header(ContentLength(res.body.len() as u64))
+                .with_header(res.content_type)
+                .with_status(res.status_code)
+                .with_body(res.body),
         ))
+    }
+}
+
+struct ResponseData {
+    body: String,
+    content_type: ContentType,
+    status_code: StatusCode,
+}
+
+impl ResponseData {
+    fn new(body: String, content_type: ContentType, status_code: StatusCode) -> ResponseData {
+        ResponseData {
+            body: body,
+            content_type: content_type,
+            status_code: status_code,
+        }
     }
 }
